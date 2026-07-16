@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Outliars — Invoice Generator</title>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#0f1317; --paper:#ffffff; --bg:#f4f5f7; --line:#e6e9ed;
+    --muted:#68727e; --faint:#9aa3ae; --teal:#0fa596; --teal-dark:#0b7f74;
+    --field:#f1f3f5; --soft:#f7f8fa; --mint:#5eead4;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Archivo',system-ui,-apple-system,'Segoe UI',sans-serif;background:var(--bg);color:var(--ink);font-size:14px;-webkit-font-smoothing:antialiased}
+  input,select,textarea,button{font:inherit;color:inherit}
+
+  /* ---------- top bar ---------- */
+  .topbar{position:sticky;top:0;z-index:10;background:rgba(15,19,23,.92);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);color:#fff;padding:12px 22px;display:flex;align-items:center;justify-content:space-between;gap:16px}
+  .brand{font-weight:800;letter-spacing:-0.02em;font-size:17px}
+  .brand small{font-weight:600;letter-spacing:0.24em;text-transform:uppercase;font-size:9.5px;color:var(--mint);margin-left:12px}
+  .topbar-right{display:flex;align-items:center;gap:14px}
+  .due-chip{text-align:right;line-height:1.25;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.09);border-radius:12px;padding:6px 14px}
+  .due-chip .lbl{font-size:8.5px;text-transform:uppercase;letter-spacing:0.2em;color:#8f99a4}
+  .due-chip .val{font-weight:700;font-variant-numeric:tabular-nums;color:var(--mint)}
+  .btn{border:none;border-radius:999px;padding:10px 20px;font-weight:700;font-size:13px;cursor:pointer;transition:all .15s}
+  .btn-primary{background:var(--teal);color:#03201c}
+  .btn-primary:hover{background:#14c2b0;transform:translateY(-1px)}
+  .btn-ghost{background:transparent;color:#c3cad2;border:1px solid #3d454f}
+  .btn-ghost:hover{color:#fff;border-color:#8b939d}
+
+  /* ---------- layout ---------- */
+  .wrap{max-width:1400px;margin:0 auto;padding:26px 22px;display:grid;grid-template-columns:430px 1fr;gap:28px;align-items:start}
+  @media(max-width:1020px){.wrap{grid-template-columns:1fr}}
+
+  /* ---------- form ---------- */
+  .panel{display:flex;flex-direction:column;gap:16px}
+  .card{background:var(--paper);border:1px solid var(--line);border-radius:18px;padding:20px;box-shadow:0 1px 3px rgba(15,19,23,.04)}
+  .card h2{font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:0.16em;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;color:#3a434d}
+  .card h2 .dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--teal);margin-right:9px;vertical-align:1px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .full{grid-column:1/-1}
+  label.f{display:block}
+  label.f span{display:block;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:var(--muted);margin-bottom:5px}
+  label.f small{display:block;font-size:10.5px;color:var(--faint);margin-top:5px;font-weight:400;text-transform:none;letter-spacing:0;line-height:1.4}
+  .in{width:100%;border:1.5px solid transparent;border-radius:11px;padding:9px 12px;font-size:13.5px;background:var(--field);transition:background .12s,border-color .12s,box-shadow .12s}
+  .in:hover{background:#ebeef1}
+  .in:focus{outline:none;background:#fff;border-color:var(--teal);box-shadow:0 0 0 4px rgba(15,165,150,.12)}
+  select.in{appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2368727e' stroke-width='1.6' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:30px}
+  textarea.in{resize:vertical}
+  .num{font-variant-numeric:tabular-nums}
+  .addline{background:var(--soft);border:none;color:var(--teal-dark);font-weight:700;font-size:11.5px;cursor:pointer;border-radius:999px;padding:5px 12px;transition:background .12s}
+  .addline:hover{background:#e5f6f3}
+
+  .item{border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:10px;background:#fff}
+  .item-row{display:grid;grid-template-columns:64px 108px 1fr 26px;gap:8px;align-items:center;margin-top:8px}
+  .rate-wrap{position:relative}
+  .rate-wrap .cur{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--faint);font-size:13px}
+  .rate-wrap .in{padding-left:24px}
+  .rm{background:none;border:none;color:var(--faint);font-size:18px;cursor:pointer;line-height:1;border-radius:8px}
+  .rm:hover{color:#dc2626}
+  .item-amt{text-align:right;font-size:11.5px;color:var(--muted);margin-top:6px;font-variant-numeric:tabular-nums}
+
+  .check{display:flex;gap:9px;align-items:flex-start;font-size:13px;color:#3d4650;padding-top:20px;cursor:pointer}
+  .check input{accent-color:var(--teal);margin-top:2px;width:15px;height:15px}
+
+  .savebar{display:flex;gap:8px;align-items:center;font-size:11px;color:var(--faint);font-weight:500;text-transform:none;letter-spacing:0}
+
+  /* ---------- invoice sheet ---------- */
+  .preview-label{font-size:10px;text-transform:uppercase;letter-spacing:0.2em;color:var(--muted);margin-bottom:10px}
+  .sheet{background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:0 20px 50px rgba(15,19,23,.10);max-width:820px;margin:0 auto;min-height:1080px;padding:56px 60px;display:flex;flex-direction:column}
+
+  .s-head{display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:26px;border-bottom:1px solid var(--line)}
+  .s-name{font-size:27px;font-weight:800;letter-spacing:-0.02em;line-height:1}
+  .s-name::after{content:"";display:block;width:42px;height:4px;border-radius:2px;background:var(--teal);margin-top:12px}
+  .s-tag{font-size:10px;text-transform:uppercase;letter-spacing:0.24em;color:var(--muted);margin-top:12px}
+  .s-invlbl{font-size:32px;font-weight:800;letter-spacing:0.04em;text-transform:uppercase;color:#e8ebee;text-align:right;line-height:1}
+  .s-invno{font-weight:700;font-size:15px;text-align:right;font-variant-numeric:tabular-nums;margin-top:6px}
+  .s-po{font-size:11.5px;color:var(--muted);text-align:right;margin-top:3px}
+
+  .s-parties{display:grid;grid-template-columns:1fr 1fr 1.1fr;gap:24px;padding:26px 0;font-size:12.5px;line-height:1.55}
+  .s-lbl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.18em;color:var(--faint);margin-bottom:7px}
+  .s-strong{font-weight:700}
+  .s-mut{color:#5b6470;white-space:pre-line}
+  .s-dates{background:var(--soft);border-radius:14px;padding:14px 16px;align-self:start}
+  .s-dates div.row{display:flex;justify-content:space-between;padding:2px 0}
+  .s-dates .k{color:var(--muted)}
+  .s-dates .v{font-weight:500}
+  .s-dates .v.b{font-weight:800;color:var(--teal-dark)}
+  .s-proj{margin-top:9px;padding-top:9px;border-top:1px solid var(--line)}
+  .s-proj .k{font-size:10.5px;color:var(--muted)}
+
+  table.s-items{width:100%;border-collapse:collapse;font-size:12.5px}
+  .s-items th{text-align:left;font-size:9px;text-transform:uppercase;letter-spacing:0.16em;color:var(--muted);padding:9px 12px;background:var(--soft);font-weight:700}
+  .s-items th:first-child{border-radius:10px 0 0 10px}
+  .s-items th:last-child{border-radius:0 10px 10px 0}
+  .s-items th.r,.s-items td.r{text-align:right}
+  .s-items td{padding:11px 12px;border-bottom:1px solid #f0f2f4;vertical-align:top}
+  .s-items tr:last-child td{border-bottom:none}
+  .s-items td.r{font-variant-numeric:tabular-nums;color:#5b6470}
+  .s-items td.amt{font-weight:700;color:var(--ink)}
+  .exp-tag{font-size:8.5px;text-transform:uppercase;letter-spacing:.12em;color:var(--teal-dark);background:#e5f6f3;border-radius:999px;padding:2px 7px;margin-left:8px}
+
+  .s-totals{display:flex;justify-content:flex-end;padding-top:14px}
+  .s-totals .box{width:300px;font-size:13px}
+  .s-totals .row{display:flex;justify-content:space-between;padding:3.5px 12px}
+  .s-totals .row .k{color:var(--muted)}
+  .s-totals .row.total{font-weight:700;border-top:1px solid var(--line);margin-top:5px;padding-top:8px}
+  .s-balance{display:flex;justify-content:space-between;align-items:center;background:var(--ink);color:#fff;border-radius:12px;padding:12px 16px;margin-top:10px}
+  .s-balance .k{font-size:9.5px;font-weight:600;text-transform:uppercase;letter-spacing:0.18em;color:#aeb6bf}
+  .s-balance .v{font-weight:800;font-size:17px;font-variant-numeric:tabular-nums;color:var(--mint)}
+  .s-novat{font-size:10.5px;color:var(--faint);text-align:right;padding:7px 4px 0}
+
+  .s-foot{margin-top:auto;padding-top:32px}
+  .s-foot-grid{display:grid;grid-template-columns:1.05fr 1fr;gap:18px;font-size:12.5px}
+  .s-pay{background:var(--soft);border-radius:14px;padding:16px 18px}
+  .s-pay div{padding:1.5px 0;color:#3d4650}
+  .s-pay .k{color:var(--faint);display:inline-block;min-width:100px}
+  .s-notes-box{padding:16px 4px}
+  .s-notes{font-size:11px;color:#5b6470;line-height:1.6;white-space:pre-line}
+  .s-thanks{text-align:center;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:0.32em;color:#c6cdd4;padding-top:28px}
+
+  .num,.tabular{font-variant-numeric:tabular-nums}
+
+  /* ---------- print ---------- */
+  @media print{
+    @page{size:A4;margin:13mm}
+    body{background:#fff}
+    *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
+    .topbar,.panel,.preview-label,.no-print{display:none!important}
+    .wrap{display:block;padding:0;max-width:none}
+    .sheet{border:none;border-radius:0;box-shadow:none;max-width:none;min-height:auto;padding:0}
+  }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">OUTLIARS<small>Invoice studio</small></div>
+  <div class="topbar-right">
+    <div class="due-chip"><div class="lbl">Balance due</div><div class="val" id="chipDue">£0.00</div></div>
+    <button class="btn btn-ghost" onclick="newInvoice()" title="Clears client & line items, keeps your details, bumps the invoice number">New invoice</button>
+    <button class="btn btn-primary" onclick="window.print()">Download PDF</button>
+  </div>
+</header>
+
+<div class="wrap">
+  <!-- ==================== FORM ==================== -->
+  <div class="panel">
+
+    <div class="card">
+      <h2><span><span class="dot"></span>Your details</span><span class="savebar" id="saveState">saved automatically</span></h2>
+      <div class="grid2">
+        <label class="f"><span>Business name</span><input class="in" id="fName" value="Outliars"></label>
+        <label class="f"><span>Tagline (optional)</span><input class="in" id="fTag" value="Sports photography & videography"></label>
+        <label class="f full"><span>Address</span><textarea class="in" id="fAddr" rows="2">London, United Kingdom</textarea></label>
+        <label class="f"><span>Email</span><input class="in" id="fEmail" value=""></label>
+        <label class="f"><span>Phone (optional)</span><input class="in" id="fPhone" value=""></label>
+        <label class="f full"><span>Company number (only if Ltd)</span><input class="in" id="fCoNo" placeholder="e.g. 12345678"><small>Legally required if Outliars is a limited company. Leave blank if sole trader / partnership.</small></label>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2><span><span class="dot"></span>Bill to</span></h2>
+      <div class="grid2">
+        <label class="f"><span>Company / client</span><input class="in" id="cCo" placeholder="e.g. Jordan Brand EMEA"></label>
+        <label class="f"><span>Contact name</span><input class="in" id="cName"></label>
+        <label class="f full"><span>Address</span><textarea class="in" id="cAddr" rows="2"></textarea></label>
+        <label class="f full"><span>Email</span><input class="in" id="cEmail"></label>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2><span><span class="dot"></span>Invoice details</span></h2>
+      <div class="grid2">
+        <label class="f"><span>Invoice number</span><input class="in num" id="mNo"><small>Must be unique & sequential — HMRC requirement. Auto-bumps when you press "New invoice".</small></label>
+        <label class="f"><span>PO number (optional)</span><input class="in" id="mPO"></label>
+        <label class="f full"><span>Project / job</span><input class="in" id="mProj" placeholder="e.g. The One — 1v1 tournament promo"></label>
+        <label class="f"><span>Issue date</span><input class="in" type="date" id="mDate"></label>
+        <label class="f"><span>Payment terms</span>
+          <select class="in" id="mTerms">
+            <option value="0">Due on receipt</option>
+            <option value="7">Net 7 days</option>
+            <option value="14" selected>Net 14 days</option>
+            <option value="30">Net 30 days</option>
+            <option value="60">Net 60 days</option>
+            <option value="custom">Custom date</option>
+          </select>
+        </label>
+        <label class="f" id="customDueWrap" style="display:none"><span>Due date</span><input class="in" type="date" id="mCustomDue"></label>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2><span><span class="dot"></span>Line items</span><button class="addline" onclick="addItem()">+ Add line</button></h2>
+      <div id="items"></div>
+    </div>
+
+    <div class="card">
+      <h2><span><span class="dot"></span>Adjustments</span></h2>
+      <div class="grid2">
+        <label class="f"><span>Discount</span>
+          <select class="in" id="dMode">
+            <option value="none">None</option>
+            <option value="percent">Percentage (%)</option>
+            <option value="fixed">Fixed amount (£)</option>
+          </select>
+        </label>
+        <label class="f" id="dValWrap" style="display:none"><span id="dValLbl">Discount</span><input class="in num" type="number" min="0" id="dVal" value="0"></label>
+        <label class="f"><span>Deposit already paid (£)</span><input class="in num" type="number" min="0" id="deposit" value="0"><small>Deducted from the total to show balance due.</small></label>
+        <label class="check"><input type="checkbox" id="noVat" checked> Show "not VAT registered" line</label>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2><span><span class="dot"></span>Payment details</span></h2>
+      <div class="grid2">
+        <label class="f"><span>Account name</span><input class="in" id="pAcc" value="Outliars"></label>
+        <label class="f"><span>Bank</span><input class="in" id="pBank"></label>
+        <label class="f"><span>Sort code</span><input class="in num" id="pSort" placeholder="00-00-00"></label>
+        <label class="f"><span>Account number</span><input class="in num" id="pNo" placeholder="12345678"></label>
+        <label class="f full"><span>Payment reference</span><input class="in" id="pRef"><small>Defaults to the invoice number if left blank.</small></label>
+        <label class="f full"><span>Notes / terms</span><textarea class="in" id="notes" rows="3">Usage: as agreed in the project brief. Late payments may incur statutory interest under the Late Payment of Commercial Debts (Interest) Act 1998.</textarea></label>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== PREVIEW ==================== -->
+  <div>
+    <div class="preview-label">Live preview — A4</div>
+    <div class="sheet" id="sheet">
+      <div class="s-head">
+        <div>
+          <div class="s-name" id="vName">Outliars</div>
+          <div class="s-tag" id="vTag"></div>
+        </div>
+        <div>
+          <div class="s-invlbl">Invoice</div>
+          <div class="s-invno" id="vNo"></div>
+          <div class="s-po" id="vPO"></div>
+        </div>
+      </div>
+
+      <div class="s-parties">
+        <div>
+          <div class="s-lbl">From</div>
+          <div class="s-strong" id="vFromName"></div>
+          <div class="s-mut" id="vFromAddr"></div>
+          <div class="s-mut" id="vFromEmail"></div>
+          <div class="s-mut" id="vFromPhone"></div>
+          <div class="s-mut" id="vFromCoNo" style="font-size:11px;margin-top:4px"></div>
+        </div>
+        <div>
+          <div class="s-lbl">Bill to</div>
+          <div class="s-strong" id="vClientCo">—</div>
+          <div class="s-mut" id="vClientName"></div>
+          <div class="s-mut" id="vClientAddr"></div>
+          <div class="s-mut" id="vClientEmail"></div>
+        </div>
+        <div class="s-dates">
+          <div class="row"><span class="k">Issued</span><span class="v" id="vIssued"></span></div>
+          <div class="row"><span class="k">Terms</span><span class="v" id="vTerms"></span></div>
+          <div class="row"><span class="k">Due</span><span class="v b" id="vDue"></span></div>
+          <div class="s-proj" id="vProjWrap" style="display:none"><div class="k">Project</div><div class="s-strong" id="vProj"></div></div>
+        </div>
+      </div>
+
+      <table class="s-items">
+        <thead><tr><th>Description</th><th class="r" style="width:85px">Qty</th><th class="r" style="width:100px">Rate</th><th class="r" style="width:100px">Amount</th></tr></thead>
+        <tbody id="vItems"></tbody>
+      </table>
+
+      <div class="s-totals">
+        <div class="box">
+          <div class="row"><span class="k">Subtotal</span><span class="tabular" id="vSub"></span></div>
+          <div class="row" id="vDiscRow" style="display:none"><span class="k" id="vDiscK">Discount</span><span class="tabular" id="vDiscV"></span></div>
+          <div class="row total"><span>Total</span><span class="tabular" id="vTotal"></span></div>
+          <div class="row" id="vDepRow" style="display:none"><span class="k">Deposit received</span><span class="tabular" id="vDepV"></span></div>
+          <div class="s-balance"><span class="k">Balance due</span><span class="v" id="vBalance"></span></div>
+          <div class="s-novat" id="vNoVat">Not VAT registered — no VAT has been charged.</div>
+        </div>
+      </div>
+
+      <div class="s-foot">
+        <div class="s-foot-grid">
+          <div class="s-pay">
+            <div class="s-lbl">Pay by bank transfer</div>
+            <div><span class="k">Account name</span><span id="vPAcc"></span></div>
+            <div id="vPBankRow" style="display:none"><span class="k">Bank</span><span id="vPBank"></span></div>
+            <div><span class="k">Sort code</span><span class="tabular" id="vPSort"></span></div>
+            <div><span class="k">Account no.</span><span class="tabular" id="vPNo"></span></div>
+            <div><span class="k">Reference</span><span id="vPRef"></span></div>
+          </div>
+          <div class="s-notes-box">
+            <div class="s-lbl">Notes & terms</div>
+            <div class="s-notes" id="vNotes"></div>
+          </div>
+        </div>
+        <div class="s-thanks" id="vThanks"></div>
+      </div>
+    </div>
+    <div style="height:40px" class="no-print"></div>
+  </div>
+</div>
+
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const gbp = new Intl.NumberFormat("en-GB",{style:"currency",currency:"GBP"});
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const todayISO = () => new Date().toISOString().slice(0,10);
+const addDays = (iso,d) => { const x=new Date(iso+"T00:00:00"); x.setDate(x.getDate()+Number(d)); return x.toISOString().slice(0,10); };
+const pretty = iso => { if(!iso) return "—"; const d=new Date(iso+"T00:00:00"); return d.toLocaleDateString("en-GB",{day:"numeric",month:"long",year:"numeric"}); };
+const UNIT = {day:"day",halfday:"half-day",hour:"hr",item:"",expense:""};
+
+let items = [];
+
+// ---------- line items ----------
+function addItem(data){
+  items.push(Object.assign({id:Math.random().toString(36).slice(2), desc:"", qty:1, unit:"day", rate:0}, data||{}));
+  renderItems(); render();
+}
+function removeItem(id){ items = items.filter(i=>i.id!==id); if(!items.length) addItem(); renderItems(); render(); }
+function renderItems(){
+  $("items").innerHTML = items.map(it => `
+    <div class="item" data-id="${it.id}">
+      <input class="in" placeholder="Description — e.g. Matchday coverage, 2× photographers" value="${esc(it.desc)}" oninput="upd('${it.id}','desc',this.value)">
+      <div class="item-row">
+        <input class="in num" type="number" min="0" step="0.5" value="${esc(it.qty)}" title="Quantity" oninput="upd('${it.id}','qty',this.value)">
+        <select class="in" onchange="upd('${it.id}','unit',this.value)">
+          ${["day","halfday","hour","item","expense"].map(u=>`<option value="${u}" ${it.unit===u?"selected":""}>${{day:"day(s)",halfday:"half-day(s)",hour:"hour(s)",item:"fixed / item",expense:"expense"}[u]}</option>`).join("")}
+        </select>
+        <div class="rate-wrap"><span class="cur">£</span><input class="in num" type="number" min="0" step="0.01" value="${esc(it.rate)}" title="Rate" oninput="upd('${it.id}','rate',this.value)"></div>
+        <button class="rm" title="Remove line" onclick="removeItem('${it.id}')">×</button>
+      </div>
+      <div class="item-amt" id="amt-${it.id}"></div>
+    </div>`).join("");
+  items.forEach(it => { $("amt-"+it.id).textContent = "= " + gbp.format((+it.qty||0)*(+it.rate||0)); });
+}
+function upd(id,k,v){ const it = items.find(i=>i.id===id); if(!it) return; it[k]=v; $("amt-"+id).textContent = "= " + gbp.format((+it.qty||0)*(+it.rate||0)); render(); }
+
+// ---------- render preview ----------
+function render(){
+  const v = id => $(id).value;
+  $("vName").textContent = v("fName") || "Your studio";
+  const tag = v("fTag"); $("vTag").textContent = tag; $("vTag").style.display = tag ? "" : "none";
+  $("vNo").textContent = v("mNo");
+  $("vPO").textContent = v("mPO") ? "PO: "+v("mPO") : "";
+  $("vFromName").textContent = v("fName");
+  $("vFromAddr").textContent = v("fAddr");
+  $("vFromEmail").textContent = v("fEmail");
+  $("vFromPhone").textContent = v("fPhone");
+  $("vFromCoNo").textContent = v("fCoNo") ? "Company no. "+v("fCoNo") : "";
+  $("vClientCo").textContent = v("cCo") || "—";
+  $("vClientName").textContent = v("cName");
+  $("vClientAddr").textContent = v("cAddr");
+  $("vClientEmail").textContent = v("cEmail");
+  $("vIssued").textContent = pretty(v("mDate"));
+
+  const terms = v("mTerms");
+  $("customDueWrap").style.display = terms==="custom" ? "" : "none";
+  const due = terms==="custom" ? v("mCustomDue") : addDays(v("mDate")||todayISO(), terms);
+  $("vTerms").textContent = terms==="0" ? "Due on receipt" : terms==="custom" ? "Custom due date" : "Net "+terms+" days";
+  $("vDue").textContent = pretty(due);
+
+  const proj = v("mProj");
+  $("vProjWrap").style.display = proj ? "" : "none";
+  $("vProj").textContent = proj;
+
+  // items table
+  $("vItems").innerHTML = items.map(it=>{
+    const amt = (+it.qty||0)*(+it.rate||0);
+    const u = UNIT[it.unit] ? " "+UNIT[it.unit]+((+it.qty)!==1?"s":"") : "";
+    return `<tr>
+      <td>${it.desc?esc(it.desc):'<span style="color:#c9cfd6">Untitled line</span>'}${it.unit==="expense"?'<span class="exp-tag">expense</span>':""}</td>
+      <td class="r">${esc(it.qty)}${u}</td>
+      <td class="r">${gbp.format(+it.rate||0)}</td>
+      <td class="r amt">${gbp.format(amt)}</td>
+    </tr>`;
+  }).join("");
+
+  // totals
+  const sub = items.reduce((s,it)=>s+(+it.qty||0)*(+it.rate||0),0);
+  const mode = v("dMode");
+  $("dValWrap").style.display = mode==="none" ? "none" : "";
+  $("dValLbl").textContent = mode==="percent" ? "Discount %" : "Discount £";
+  let disc = 0;
+  if(mode==="percent") disc = sub*(+v("dVal")||0)/100;
+  if(mode==="fixed") disc = +v("dVal")||0;
+  disc = Math.min(disc, sub);
+  const total = sub - disc;
+  const dep = Math.min(+v("deposit")||0, total);
+  const bal = total - dep;
+
+  $("vSub").textContent = gbp.format(sub);
+  $("vDiscRow").style.display = disc>0 ? "flex" : "none";
+  $("vDiscK").textContent = "Discount" + (mode==="percent" ? ` (${v("dVal")}%)` : "");
+  $("vDiscV").textContent = "−"+gbp.format(disc);
+  $("vTotal").textContent = gbp.format(total);
+  $("vDepRow").style.display = dep>0 ? "flex" : "none";
+  $("vDepV").textContent = "−"+gbp.format(dep);
+  $("vBalance").textContent = gbp.format(bal);
+  $("chipDue").textContent = gbp.format(bal);
+  $("vNoVat").style.display = $("noVat").checked ? "" : "none";
+
+  // payment
+  $("vPAcc").textContent = v("pAcc") || "—";
+  const bank = v("pBank"); $("vPBankRow").style.display = bank ? "" : "none"; $("vPBank").textContent = bank;
+  $("vPSort").textContent = v("pSort") || "—";
+  $("vPNo").textContent = v("pNo") || "—";
+  $("vPRef").textContent = v("pRef") || v("mNo");
+  $("vNotes").textContent = v("notes");
+  $("vThanks").textContent = (v("fName")||"") + " — thank you";
+
+  save();
+}
+
+// ---------- persistence ----------
+const SAVE_KEYS = ["fName","fTag","fAddr","fEmail","fPhone","fCoNo","pAcc","pBank","pSort","pNo","notes","mTerms","noVat"];
+const DRAFT_KEYS = ["cCo","cName","cAddr","cEmail","mNo","mPO","mProj","mDate","mCustomDue","dMode","dVal","deposit","pRef"];
+function save(){
+  try{
+    const std = {}; SAVE_KEYS.forEach(k => std[k] = k==="noVat" ? $(k).checked : $(k).value);
+    localStorage.setItem("outliars_std", JSON.stringify(std));
+    const draft = {items};
+    DRAFT_KEYS.forEach(k => draft[k] = $(k).value);
+    localStorage.setItem("outliars_draft", JSON.stringify(draft));
+  }catch(e){ $("saveState").textContent = "autosave unavailable"; }
+}
+function load(){
+  try{
+    const std = JSON.parse(localStorage.getItem("outliars_std")||"null");
+    if(std) SAVE_KEYS.forEach(k => { if(k in std){ if(k==="noVat") $(k).checked = std[k]; else $(k).value = std[k]; } });
+    const draft = JSON.parse(localStorage.getItem("outliars_draft")||"null");
+    if(draft){
+      DRAFT_KEYS.forEach(k => { if(k in draft && draft[k]!=null) $(k).value = draft[k]; });
+      if(Array.isArray(draft.items) && draft.items.length) items = draft.items;
+    }
+  }catch(e){}
+}
+
+// ---------- new invoice ----------
+function bumpNumber(no){
+  const m = String(no).match(/^(.*?)(\d+)\s*$/);
+  if(!m) return no;
+  const next = String(Number(m[2]) + 1).padStart(m[2].length, "0");
+  return m[1] + next;
+}
+function newInvoice(){
+  if(!confirm("Start a new invoice? Client details and line items will be cleared. Your business & payment details are kept, and the invoice number is bumped.")) return;
+  $("mNo").value = bumpNumber($("mNo").value);
+  ["cCo","cName","cAddr","cEmail","mPO","mProj","mCustomDue","pRef"].forEach(k => $(k).value = "");
+  $("mDate").value = todayISO();
+  $("dMode").value = "none"; $("dVal").value = 0; $("deposit").value = 0;
+  items = [];
+  addItem({desc:"Shoot day — stills & motion coverage", unit:"day"});
+  addItem({desc:"Post-production — edit, grade & delivery", unit:"item"});
+  renderItems(); render();
+  window.scrollTo({top:0, behavior:"smooth"});
+}
+
+// ---------- init ----------
+document.addEventListener("input", e => { if(e.target.closest(".panel")) render(); });
+document.addEventListener("change", e => { if(e.target.closest(".panel")) render(); });
+
+$("mDate").value = todayISO();
+$("mNo").value = "OUT-" + new Date().getFullYear() + "-001";
+load();
+if(!items.length){
+  addItem({desc:"Shoot day — stills & motion coverage", unit:"day"});
+  addItem({desc:"Post-production — edit, grade & delivery", unit:"item"});
+} else {
+  renderItems();
+}
+render();
+</script>
+</body>
+</html>
