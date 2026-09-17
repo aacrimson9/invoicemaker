@@ -49,8 +49,13 @@
   select.in{appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2368727e' stroke-width='1.6' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:30px}
   textarea.in{resize:vertical}
   .num{font-variant-numeric:tabular-nums}
-  .addline{background:var(--soft);border:none;color:var(--teal-dark);font-weight:700;font-size:11.5px;cursor:pointer;border-radius:999px;padding:5px 12px;transition:background .12s}
+  .addline{background:var(--soft);border:none;color:var(--teal-dark);font-weight:700;font-size:11.5px;cursor:pointer;border-radius:999px;padding:5px 12px;transition:background .12s;white-space:nowrap}
   .addline:hover{background:#e5f6f3}
+  .addline:disabled{opacity:.4;cursor:not-allowed;background:var(--soft)}
+  .addline.danger{color:#b42318;background:#fdeceb}
+  .addline.danger:hover{background:#fbdad8}
+  .client-row{display:flex;gap:8px;align-items:center}
+  .client-row select{flex:1;min-width:0}
 
   .item{border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:10px;background:#fff}
   .item-row{display:grid;grid-template-columns:64px 108px 1fr 26px;gap:8px;align-items:center;margin-top:8px}
@@ -163,6 +168,17 @@
     <div class="card">
       <h2><span><span class="dot"></span>Bill to</span></h2>
       <div class="grid2">
+        <label class="f full">
+          <span>Saved clients</span>
+          <div class="client-row">
+            <select class="in" id="clientPicker">
+              <option value="">— Select a recurring client —</option>
+            </select>
+            <button type="button" class="addline" onclick="saveClient()" title="Save the fields below as a recurring client">Save</button>
+            <button type="button" class="addline danger" id="deleteClientBtn" onclick="deleteClient()" disabled title="Remove the selected client from this list">Delete</button>
+          </div>
+          <small>Pick a saved client to autofill, or fill in the fields below and hit Save to add them.</small>
+        </label>
         <label class="f"><span>Company / client</span><input class="in" id="cCo" placeholder="e.g. Jordan Brand EMEA"></label>
         <label class="f"><span>Contact name</span><input class="in" id="cName"></label>
         <label class="f full"><span>Address</span><textarea class="in" id="cAddr" rows="2"></textarea></label>
@@ -339,6 +355,59 @@ function renderItems(){
 }
 function upd(id,k,v){ const it = items.find(i=>i.id===id); if(!it) return; it[k]=v; $("amt-"+id).textContent = "= " + gbp.format((+it.qty||0)*(+it.rate||0)); render(); }
 
+// ---------- saved clients ----------
+function loadClients(){
+  try{ return JSON.parse(localStorage.getItem("outliars_clients")||"[]"); }catch(e){ return []; }
+}
+function persistClients(list){
+  try{ localStorage.setItem("outliars_clients", JSON.stringify(list)); }catch(e){}
+}
+function renderClientPicker(selectId){
+  const list = loadClients();
+  const sel = $("clientPicker");
+  const wanted = selectId !== undefined ? selectId : sel.value;
+  sel.innerHTML = '<option value="">— Select a recurring client —</option>' +
+    list.map(c => `<option value="${esc(c.id)}">${esc(c.label)}</option>`).join("");
+  sel.value = list.some(c => c.id === wanted) ? wanted : "";
+  $("deleteClientBtn").disabled = !sel.value;
+}
+function applyClient(id){
+  const c = loadClients().find(x => x.id === id);
+  if(!c) return;
+  $("cCo").value = c.cCo || "";
+  $("cName").value = c.cName || "";
+  $("cAddr").value = c.cAddr || "";
+  $("cEmail").value = c.cEmail || "";
+  render();
+}
+function saveClient(){
+  const cCo = $("cCo").value.trim();
+  if(!cCo){ alert("Add a company / client name before saving it as a recurring client."); return; }
+  const list = loadClients();
+  const data = { cCo, cName: $("cName").value, cAddr: $("cAddr").value, cEmail: $("cEmail").value };
+  const existing = list.find(c => c.cCo.trim().toLowerCase() === cCo.toLowerCase());
+  let targetId;
+  if(existing){
+    if(!confirm(`"${cCo}" is already saved. Update it with the current details?`)) return;
+    Object.assign(existing, data, { label: cCo });
+    targetId = existing.id;
+  } else {
+    targetId = Math.random().toString(36).slice(2);
+    list.push(Object.assign({ id: targetId, label: cCo }, data));
+  }
+  persistClients(list);
+  renderClientPicker(targetId);
+}
+function deleteClient(){
+  const id = $("clientPicker").value;
+  if(!id) return;
+  const list = loadClients();
+  const c = list.find(x => x.id === id);
+  if(!confirm(`Remove "${c ? c.label : "this client"}" from your saved clients? This won't change the current invoice.`)) return;
+  persistClients(list.filter(x => x.id !== id));
+  renderClientPicker("");
+}
+
 // ---------- render preview ----------
 function render(){
   const v = id => $(id).value;
@@ -450,6 +519,7 @@ function newInvoice(){
   if(!confirm("Start a new invoice? Client details and line items will be cleared. Your business & payment details are kept, and the invoice number is bumped.")) return;
   $("mNo").value = bumpNumber($("mNo").value);
   ["cCo","cName","cAddr","cEmail","mPO","mProj","mCustomDue","pRef"].forEach(k => $(k).value = "");
+  $("clientPicker").value = ""; $("deleteClientBtn").disabled = true;
   $("mDate").value = todayISO();
   $("dMode").value = "none"; $("dVal").value = 0; $("deposit").value = 0;
   items = [];
@@ -461,11 +531,15 @@ function newInvoice(){
 
 // ---------- init ----------
 document.addEventListener("input", e => { if(e.target.closest(".panel")) render(); });
-document.addEventListener("change", e => { if(e.target.closest(".panel")) render(); });
+document.addEventListener("change", e => {
+  if(e.target.id === "clientPicker"){ applyClient(e.target.value); $("deleteClientBtn").disabled = !e.target.value; return; }
+  if(e.target.closest(".panel")) render();
+});
 
 $("mDate").value = todayISO();
 $("mNo").value = "OUT-" + new Date().getFullYear() + "-001";
 load();
+renderClientPicker();
 if(!items.length){
   addItem({desc:"Shoot day — stills & motion coverage", unit:"day"});
   addItem({desc:"Post-production — edit, grade & delivery", unit:"item"});
