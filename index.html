@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Outliars — Invoice Generator</title>
+<title>Invoice Generator</title>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
   :root{
@@ -127,6 +127,24 @@
 
   .num,.tabular{font-variant-numeric:tabular-nums}
 
+  /* ---------- history ---------- */
+  .history-wrap{max-width:1000px;margin:0 auto;padding:28px 22px}
+  .history-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+  .history-head h1{font-size:19px;font-weight:800;letter-spacing:-0.01em}
+  .history-sub{font-size:12.5px;color:var(--muted);margin-top:3px}
+  .history-list{display:flex;flex-direction:column;gap:10px}
+  .history-empty{background:var(--paper);border:1px dashed var(--line);border-radius:14px;padding:34px;text-align:center;color:var(--muted);font-size:13.5px}
+  .history-row{display:grid;grid-template-columns:118px 1fr 96px 96px auto;gap:14px;align-items:center;background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:14px 16px}
+  .hr-no{font-weight:700;font-variant-numeric:tabular-nums;font-size:13px}
+  .hr-co{font-weight:600;font-size:13.5px}
+  .hr-date{font-size:11.5px;color:var(--muted);margin-top:2px}
+  .hr-amt,.hr-bal{text-align:right;font-variant-numeric:tabular-nums;font-weight:600;font-size:13px}
+  .hr-bal{color:var(--teal-dark)}
+  .hr-lbl{display:block;font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--faint);margin-bottom:2px}
+  .hr-actions{display:flex;gap:6px;justify-content:flex-end}
+  body.history-mode #btnNew,body.history-mode #btnDownload,body.history-mode #dueChip,body.history-mode #btnHistory{display:none}
+  @media(max-width:640px){.history-row{grid-template-columns:1fr 1fr;row-gap:8px}.hr-actions{grid-column:1/-1;justify-content:flex-start}}
+
   /* ---------- print ---------- */
   @media print{
     @page{size:A4;margin:13mm}
@@ -141,14 +159,29 @@
 <body>
 
 <header class="topbar">
-  <div class="brand">OUTLIARS<small>Invoice studio</small></div>
+  <div class="brand">Invoice Studio</div>
   <div class="topbar-right">
-    <div class="due-chip"><div class="lbl">Balance due</div><div class="val" id="chipDue">£0.00</div></div>
-    <button class="btn btn-ghost" onclick="newInvoice()" title="Clears client & line items, keeps your details, bumps the invoice number">New invoice</button>
-    <button class="btn btn-primary" onclick="window.print()">Download PDF</button>
+    <div class="due-chip" id="dueChip"><div class="lbl">Balance due</div><div class="val" id="chipDue">£0.00</div></div>
+    <button class="btn btn-ghost" id="btnHistory" onclick="showHistory()">History</button>
+    <button class="btn btn-ghost" id="btnNew" onclick="newInvoice()" title="Clears client & line items, keeps your details, bumps the invoice number">New invoice</button>
+    <button class="btn btn-primary" id="btnDownload" onclick="saveToHistory(); window.print()">Download PDF</button>
   </div>
 </header>
 
+<div id="historyView" class="no-print" style="display:none">
+  <div class="history-wrap">
+    <div class="history-head">
+      <div>
+        <h1>Invoice history</h1>
+        <div class="history-sub">Every invoice you've downloaded as a PDF, saved automatically.</div>
+      </div>
+      <button class="btn btn-ghost" onclick="hideHistory()">← Back to editor</button>
+    </div>
+    <div class="history-list" id="historyList"></div>
+  </div>
+</div>
+
+<div id="editorView">
 <div class="wrap">
   <!-- ==================== FORM ==================== -->
   <div class="panel">
@@ -156,12 +189,12 @@
     <div class="card">
       <h2><span><span class="dot"></span>Your details</span><span class="savebar" id="saveState">saved automatically</span></h2>
       <div class="grid2">
-        <label class="f"><span>Business name</span><input class="in" id="fName" value="Outliars"></label>
-        <label class="f"><span>Tagline (optional)</span><input class="in" id="fTag" value="Sports photography & videography"></label>
-        <label class="f full"><span>Address</span><textarea class="in" id="fAddr" rows="2">London, United Kingdom</textarea></label>
+        <label class="f"><span>Business name</span><input class="in" id="fName" placeholder="Your business or brand name"></label>
+        <label class="f"><span>Tagline (optional)</span><input class="in" id="fTag" placeholder="e.g. Sports photography & videography"></label>
+        <label class="f full"><span>Address</span><textarea class="in" id="fAddr" rows="2" placeholder="Your business address"></textarea></label>
         <label class="f"><span>Email</span><input class="in" id="fEmail" value=""></label>
         <label class="f"><span>Phone (optional)</span><input class="in" id="fPhone" value=""></label>
-        <label class="f full"><span>Company number (only if Ltd)</span><input class="in" id="fCoNo" placeholder="e.g. 12345678"><small>Legally required if Outliars is a limited company. Leave blank if sole trader / partnership.</small></label>
+        <label class="f full"><span>Company number (only if Ltd)</span><input class="in" id="fCoNo" placeholder="e.g. 12345678"><small>Legally required if your business is a limited company. Leave blank if sole trader / partnership.</small></label>
       </div>
     </div>
 
@@ -231,7 +264,7 @@
     <div class="card">
       <h2><span><span class="dot"></span>Payment details</span></h2>
       <div class="grid2">
-        <label class="f"><span>Account name</span><input class="in" id="pAcc" value="Outliars"></label>
+        <label class="f"><span>Account name</span><input class="in" id="pAcc" placeholder="Name on your bank account"></label>
         <label class="f"><span>Bank</span><input class="in" id="pBank"></label>
         <label class="f"><span>Sort code</span><input class="in num" id="pSort" placeholder="00-00-00"></label>
         <label class="f"><span>Account number</span><input class="in num" id="pNo" placeholder="12345678"></label>
@@ -247,7 +280,7 @@
     <div class="sheet" id="sheet">
       <div class="s-head">
         <div>
-          <div class="s-name" id="vName">Outliars</div>
+          <div class="s-name" id="vName">Your studio</div>
           <div class="s-tag" id="vTag"></div>
         </div>
         <div>
@@ -318,6 +351,7 @@
     <div style="height:40px" class="no-print"></div>
   </div>
 </div>
+</div>
 
 <script>
 "use strict";
@@ -354,6 +388,92 @@ function renderItems(){
   items.forEach(it => { $("amt-"+it.id).textContent = "= " + gbp.format((+it.qty||0)*(+it.rate||0)); });
 }
 function upd(id,k,v){ const it = items.find(i=>i.id===id); if(!it) return; it[k]=v; $("amt-"+id).textContent = "= " + gbp.format((+it.qty||0)*(+it.rate||0)); render(); }
+
+// ---------- invoice history ----------
+function loadHistory(){
+  try{ return JSON.parse(localStorage.getItem("outliars_history")||"[]"); }catch(e){ return []; }
+}
+function persistHistory(list){
+  try{ localStorage.setItem("outliars_history", JSON.stringify(list)); }catch(e){}
+}
+function snapshotInvoice(){
+  const snap = {};
+  SAVE_KEYS.forEach(k => snap[k] = k==="noVat" ? $(k).checked : $(k).value);
+  DRAFT_KEYS.forEach(k => snap[k] = $(k).value);
+  snap.items = JSON.parse(JSON.stringify(items));
+  snap.savedAt = new Date().toISOString();
+  return snap;
+}
+function computeSnapTotals(snap){
+  const sub = (snap.items||[]).reduce((s,it)=>s+(+it.qty||0)*(+it.rate||0),0);
+  let disc = 0;
+  if(snap.dMode==="percent") disc = sub*(+snap.dVal||0)/100;
+  if(snap.dMode==="fixed") disc = +snap.dVal||0;
+  disc = Math.min(disc, sub);
+  const total = sub - disc;
+  const dep = Math.min(+snap.deposit||0, total);
+  return { total, bal: total - dep };
+}
+function saveToHistory(){
+  const snap = snapshotInvoice();
+  const no = (snap.mNo||"").trim();
+  if(!no) return;
+  const list = loadHistory();
+  const idx = list.findIndex(h => h.mNo === no);
+  if(idx >= 0) list[idx] = snap; else list.push(snap);
+  persistHistory(list);
+}
+function renderHistory(){
+  const list = loadHistory().slice().sort((a,b) => String(b.mNo||"").localeCompare(String(a.mNo||""), undefined, {numeric:true}));
+  const el = $("historyList");
+  if(!list.length){
+    el.innerHTML = `<div class="history-empty">No invoices saved yet — download one as a PDF and it'll show up here.</div>`;
+    return;
+  }
+  el.innerHTML = list.map(h => {
+    const t = computeSnapTotals(h);
+    return `<div class="history-row">
+      <div><span class="hr-lbl">Invoice</span><span class="hr-no">${esc(h.mNo||"—")}</span></div>
+      <div><span class="hr-lbl">Client</span><div class="hr-co">${esc(h.cCo||"—")}</div><div class="hr-date">${pretty(h.mDate)}</div></div>
+      <div><span class="hr-lbl">Total</span><span class="hr-amt">${gbp.format(t.total)}</span></div>
+      <div><span class="hr-lbl">Balance</span><span class="hr-bal">${gbp.format(t.bal)}</span></div>
+      <div class="hr-actions">
+        <button class="addline" onclick="loadFromHistory('${esc(h.mNo).replace(/'/g,"\\'")}')">Load</button>
+        <button class="addline danger" onclick="deleteFromHistory('${esc(h.mNo).replace(/'/g,"\\'")}')">Delete</button>
+      </div>
+    </div>`;
+  }).join("");
+}
+function loadFromHistory(no){
+  const h = loadHistory().find(x => x.mNo === no);
+  if(!h) return;
+  if(!confirm(`Load invoice ${no} into the editor? This replaces what's currently on screen.`)) return;
+  SAVE_KEYS.forEach(k => { if(k in h){ if(k==="noVat") $(k).checked = h[k]; else $(k).value = h[k]; } });
+  DRAFT_KEYS.forEach(k => { if(k in h && h[k]!=null) $(k).value = h[k]; });
+  items = (Array.isArray(h.items) && h.items.length) ? h.items : items;
+  renderItems();
+  hideHistory();
+  render();
+  window.scrollTo({top:0, behavior:"smooth"});
+}
+function deleteFromHistory(no){
+  if(!confirm(`Delete invoice ${no} from history? This can't be undone, and won't affect a PDF you've already saved elsewhere.`)) return;
+  persistHistory(loadHistory().filter(h => h.mNo !== no));
+  renderHistory();
+}
+function showHistory(){
+  renderHistory();
+  document.body.classList.add("history-mode");
+  $("editorView").style.display = "none";
+  $("historyView").style.display = "block";
+  window.scrollTo({top:0});
+}
+function hideHistory(){
+  document.body.classList.remove("history-mode");
+  $("historyView").style.display = "none";
+  $("editorView").style.display = "block";
+}
+window.addEventListener("beforeprint", hideHistory);
 
 // ---------- saved clients ----------
 function loadClients(){
